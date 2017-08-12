@@ -1,7 +1,6 @@
 package sema
 
 import (
-	"fmt"
 	"sync"
 	"testing"
 	"time"
@@ -75,10 +74,8 @@ func TestConcurrency(t *testing.T) {
 		defer wg.Done()
 		for x := 1; x <= cap; x++ {
 			sema.Acquire()
-			fmt.Println("w1 acquire")
 			time.Sleep(time.Duration(cap) * time.Nanosecond)
 			sema.Release()
-			fmt.Println("w1 release")
 		}
 	}()
 
@@ -87,17 +84,14 @@ func TestConcurrency(t *testing.T) {
 		defer wg.Done()
 		for x := 1; x <= cap; x++ {
 			sema.Acquire()
-			fmt.Println("w2 acquire")
 			time.Sleep(time.Duration(cap) * time.Nanosecond)
 			sema.Release()
-			fmt.Println("w2 release")
 		}
 	}()
 
 	for x := 1; x <= cap; x++ {
 		time.Sleep(time.Duration(cap) * time.Nanosecond)
 		sema.Release()
-		fmt.Println("main release")
 	}
 
 	wg.Wait()
