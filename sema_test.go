@@ -1,6 +1,8 @@
 package sema
 
 import (
+	"fmt"
+	"sync"
 	"testing"
 	"time"
 )
@@ -56,5 +58,50 @@ func TestAcquireWithin(t *testing.T) {
 	}
 	if sema.AcquireWithin(1 * time.Millisecond) {
 		t.Errorf("Success to AcquireWithin() with Cap() == %d and Holders() == %d", sema.Cap(), sema.Holders())
+	}
+}
+
+func TestConcurrency(t *testing.T) {
+	cap := 10
+	sema, _ := New(cap)
+	wg := &sync.WaitGroup{}
+
+	for x := 1; x <= cap; x++ {
+		sema.Acquire()
+	}
+
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		for x := 1; x <= cap; x++ {
+			sema.Acquire()
+			fmt.Println("w1 acquire")
+			time.Sleep(time.Duration(cap) * time.Nanosecond)
+			sema.Release()
+			fmt.Println("w1 release")
+		}
+	}()
+
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		for x := 1; x <= cap; x++ {
+			sema.Acquire()
+			fmt.Println("w2 acquire")
+			time.Sleep(time.Duration(cap) * time.Nanosecond)
+			sema.Release()
+			fmt.Println("w2 release")
+		}
+	}()
+
+	for x := 1; x <= cap; x++ {
+		time.Sleep(time.Duration(cap) * time.Nanosecond)
+		sema.Release()
+		fmt.Println("main release")
+	}
+
+	wg.Wait()
+	if sema.Holders() != 0 {
+		t.Errorf("Expected Holders() == %d, got %d", 0, sema.Holders())
 	}
 }
