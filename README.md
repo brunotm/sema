@@ -1,10 +1,16 @@
-# Sema
+# Sema [![Build Status](https://travis-ci.org/brunotm/sema.svg?branch=master)](https://travis-ci.org/brunotm/sema)
 
 Sema is a simple semaphore implementation for Go (golang) using channels to control concurrent access to shared resources.
 (Go still lacks a user accessible semaphore implementation in the standard library)
 
 ## Example
 
+### Install
+```bash
+go get github.com/brunotm/sema
+```
+
+### Usage
 ```go
 
 package main
