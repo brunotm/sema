@@ -2,7 +2,6 @@ package sema
 
 import (
 	"fmt"
-	"sync/atomic"
 	"time"
 )
 
@@ -11,51 +10,41 @@ var (
 )
 
 // Sema provides a simple semaphore implementation using a channel
-type Sema struct {
-	sm      chan struct{}
-	holders *int64
-}
+type Sema chan struct{}
 
 // New creates a new semaphore with the given maximum capacity for concurrent access.
 // Will panic if cap < 1
-func New(cap int) (*Sema, error) {
+func New(cap int) (Sema, error) {
 	if cap < 1 {
 		return nil, errCap
 	}
-
-	h := int64(0)
-	return &Sema{
-		sm:      make(chan struct{}, cap),
-		holders: &h,
-	}, nil
+	return make(Sema, cap), nil
 }
 
 // Acquire the semaphore, will block if semaphore is full
 // until any other holder release it.
 // Will panic if semaphore is nil
-func (s *Sema) Acquire() {
+func (s Sema) Acquire() {
 	s.checkNil()
-	s.sm <- struct{}{}
-	atomic.AddInt64(s.holders, 1)
+	s <- struct{}{}
 }
 
 // Release the semaphore
 // Will panic if called on a non acquired semaphore
-func (s *Sema) Release() {
+func (s Sema) Release() {
 	s.checkNil()
-	if atomic.AddInt64(s.holders, -1) < 0 {
+	if len(s) < 1 {
 		panic("sema: calling release on a empty semaphore")
 	}
-	<-s.sm
+	<-s
 }
 
 // TryAcquire the semaphore without blocking return true on success and false on failure.
 // Will panic if semaphore is nil
-func (s *Sema) TryAcquire() bool {
+func (s Sema) TryAcquire() bool {
 	s.checkNil()
 	select {
-	case s.sm <- struct{}{}:
-		atomic.AddInt64(s.holders, 1)
+	case s <- struct{}{}:
 		return true
 	default:
 		return false
@@ -64,11 +53,10 @@ func (s *Sema) TryAcquire() bool {
 
 // AcquireWithin the given timeout return true on success and false on failure
 // Will panic if semaphore is nil
-func (s *Sema) AcquireWithin(timeout time.Duration) bool {
+func (s Sema) AcquireWithin(timeout time.Duration) bool {
 	s.checkNil()
 	select {
-	case s.sm <- struct{}{}:
-		atomic.AddInt64(s.holders, 1)
+	case s <- struct{}{}:
 		return true
 	case <-time.After(timeout):
 		return false
@@ -77,20 +65,20 @@ func (s *Sema) AcquireWithin(timeout time.Duration) bool {
 
 // Holders return the current holders count
 // Will panic if semaphore is nil
-func (s *Sema) Holders() int {
+func (s Sema) Holders() int {
 	s.checkNil()
-	return int(atomic.LoadInt64(s.holders))
+	return len(s)
 }
 
 // Cap return semaphore capacity
 // Will panic if semaphore is nil
-func (s *Sema) Cap() int {
+func (s Sema) Cap() int {
 	s.checkNil()
-	return cap(s.sm)
+	return cap(s)
 }
 
-func (s *Sema) checkNil() {
-	if s.sm == nil {
+func (s Sema) checkNil() {
+	if s == nil {
 		panic("sema: calling on a nil semaphore")
 	}
 }
