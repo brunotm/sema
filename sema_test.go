@@ -19,7 +19,7 @@ func TestNew(t *testing.T) {
 func TestAcquireRelease(t *testing.T) {
 	sema, _ := New(10)
 
-	for x := 1; x <= sema.Cap(); x++ {
+	for x := 0; x < sema.Cap(); x++ {
 		sema.Acquire()
 	}
 
