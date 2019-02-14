@@ -99,3 +99,53 @@ func TestConcurrency(t *testing.T) {
 		t.Errorf("Expected Holders() == %d, got %d", 0, sema.Holders())
 	}
 }
+
+func BenchmarkAcquireRelease(b *testing.B) {
+	sema, _ := New(10)
+	for i := 0; i < b.N; i++ {
+		for x := 0; x < 10; x++ {
+			sema.Acquire()
+		}
+
+		for x := 0; x < 10; x++ {
+			sema.Release()
+		}
+	}
+}
+
+func BenchmarkConcurrency(b *testing.B) {
+	cap := 10
+	sema, _ := New(cap)
+	wg := &sync.WaitGroup{}
+
+	b.ReportAllocs()
+	for i := 0; i < b.N; i++ {
+		for x := 1; x <= cap; x++ {
+			sema.Acquire()
+		}
+
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			for x := 1; x <= cap; x++ {
+				sema.Acquire()
+				sema.Release()
+			}
+		}()
+
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			for x := 1; x <= cap; x++ {
+				sema.Acquire()
+				sema.Release()
+			}
+		}()
+
+		for x := 1; x <= cap; x++ {
+			sema.Release()
+		}
+
+		wg.Wait()
+	}
+}
