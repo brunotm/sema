@@ -2,7 +2,6 @@ package sema
 
 import (
 	"errors"
-	"sync"
 	"time"
 )
 
@@ -11,73 +10,65 @@ var (
 )
 
 // Sema provides a simple semaphore implementation
-type Sema struct {
-	cond  *sync.Cond
-	cap   int
-	count int
-}
+type Sema chan struct{}
 
 // New creates a new semaphore with the given maximum capacity for concurrent access.
-func New(cap int) (s *Sema, err error) {
-	if cap < 1 {
+func New(size int) (s Sema, err error) {
+	if size < 1 {
 		return nil, errCap
 	}
-	s = &Sema{}
-	s.cap = cap
-	s.cond = sync.NewCond(&sync.Mutex{})
-	return s, nil
+	return make(Sema, size), nil
 }
 
-// Acquire the semaphore, will block if semaphore is full until any other holder release it.
-func (s *Sema) Acquire() {
-	s.cond.L.Lock()
-	for s.count == s.cap {
-		s.cond.Wait()
-	}
-	s.count++
-	s.cond.Signal()
-	s.cond.L.Unlock()
+// Acquire will block if semaphore is full until any other holder release it.
+func (s Sema) Acquire() {
+	s.check()
+	s <- struct{}{}
 }
 
-// Release the semaphore allowing waking waiters if any to acquire.
-func (s *Sema) Release() {
-	s.cond.L.Lock()
-	if s.count == 0 {
+// Release the semaphore allowing wating waiters to acquire.
+func (s Sema) Release() {
+	s.check()
+	if len(s) < 1 {
 		panic("sema: calling release on a empty semaphore")
 	}
-	s.count--
-	s.cond.Signal()
-	s.cond.L.Unlock()
+	<-s
 }
 
 // TryAcquire the semaphore without blocking return true on success and false on failure.
-func (s *Sema) TryAcquire() bool {
-	s.cond.L.Lock()
-	if s.count == s.cap {
-		s.cond.L.Unlock()
+func (s Sema) TryAcquire() (ok bool) {
+	s.check()
+	select {
+	case s <- struct{}{}:
+		return true
+	default:
 		return false
 	}
-	s.count++
-	s.cond.Signal()
-	s.cond.L.Unlock()
-	return true
 }
 
 // AcquireWithin the given timeout return true on success and false on failure
-func (s *Sema) AcquireWithin(timeout time.Duration) bool {
-	if s.TryAcquire() {
+func (s Sema) AcquireWithin(timeout time.Duration) (ok bool) {
+	s.check()
+	select {
+	case s <- struct{}{}:
 		return true
+	case <-time.After(timeout):
+		return false
 	}
-	time.Sleep(timeout)
-	return s.TryAcquire()
 }
 
 // Holders return the current holders count
-func (s *Sema) Holders() int {
-	return s.count
+func (s Sema) Holders() (count int) {
+	return len(s)
 }
 
 // Cap return semaphore capacity
-func (s *Sema) Cap() int {
-	return s.cap
+func (s Sema) Cap() (sinze int) {
+	return cap(s)
+}
+
+func (s Sema) check() {
+	if s == nil {
+		panic("sema: calling on a nil semaphore")
+	}
 }
