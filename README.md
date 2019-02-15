@@ -16,6 +16,7 @@ go get github.com/brunotm/sema
 package main
 import (
 	"time"
+	"context"
 	"github.com/brunotm/sema"
 )
 
@@ -35,6 +36,12 @@ func main() {
 
 	// OR
 	if s.AcquireWithin(5 * time.Millisecond) {
+		defer s.Release()
+		// DO WORK...
+	}
+
+	// OR
+	if s.AcquireWith(context.Background()) {
 		defer s.Release()
 		// DO WORK...
 	}
