@@ -1,6 +1,8 @@
 package sema
 
 import (
+	"context"
+	"runtime"
 	"sync"
 	"testing"
 	"time"
@@ -37,6 +39,21 @@ func TestAcquireRelease(t *testing.T) {
 
 }
 
+func TestAcquireWith(t *testing.T) {
+	sema, _ := New(1)
+
+	ctx, cancel := context.WithCancel(context.Background())
+
+	if !sema.AcquireWith(ctx) {
+		t.Errorf("Failed to AcquireWith() with Cap() == %d and Holders() == %d and a valid context", sema.Cap(), sema.Holders())
+	}
+
+	cancel()
+	if sema.AcquireWith(ctx) {
+		t.Errorf("Success to AcquireWith() with Cap() == %d and Holders() == %d and a canceled context", sema.Cap(), sema.Holders())
+	}
+}
+
 func TestTryAcquire(t *testing.T) {
 	sema, _ := New(1)
 
@@ -61,36 +78,28 @@ func TestAcquireWithin(t *testing.T) {
 }
 
 func TestConcurrency(t *testing.T) {
-	cap := 10
-	sema, _ := New(cap)
+	size := 10
+	sema, _ := New(size)
 	wg := &sync.WaitGroup{}
 
-	for x := 0; x < cap; x++ {
+	for x := 0; x < size; x++ {
 		sema.Acquire()
 	}
 
-	wg.Add(1)
-	go func() {
-		defer wg.Done()
-		for x := 0; x < cap; x++ {
-			sema.Acquire()
-			time.Sleep(time.Duration(cap) * time.Nanosecond)
-			sema.Release()
-		}
-	}()
+	for x := 0; x < runtime.NumCPU(); x++ {
+		wg.Add(1)
+		go func() {
+			for x := 0; x < size; x++ {
+				sema.Acquire()
+				time.Sleep(time.Duration(size) * time.Nanosecond)
+				sema.Release()
+			}
+			wg.Done()
+		}()
+	}
 
-	wg.Add(1)
-	go func() {
-		defer wg.Done()
-		for x := 0; x < cap; x++ {
-			sema.Acquire()
-			time.Sleep(time.Duration(cap) * time.Nanosecond)
-			sema.Release()
-		}
-	}()
-
-	for x := 0; x < cap; x++ {
-		time.Sleep(time.Duration(cap) * time.Nanosecond)
+	for x := 0; x < size; x++ {
+		time.Sleep(time.Duration(size) * time.Nanosecond)
 		sema.Release()
 	}
 
@@ -114,35 +123,30 @@ func BenchmarkAcquireRelease(b *testing.B) {
 }
 
 func BenchmarkConcurrency(b *testing.B) {
-	cap := 10
-	sema, _ := New(cap)
+	size := 10
+	sema, _ := New(size)
 	wg := &sync.WaitGroup{}
+
+	cpus := runtime.NumCPU()
 
 	b.ReportAllocs()
 	for i := 0; i < b.N; i++ {
-		for x := 0; x < cap; x++ {
+		for x := 0; x < size; x++ {
 			sema.Acquire()
 		}
 
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
-			for x := 1; x <= cap; x++ {
-				sema.Acquire()
-				sema.Release()
-			}
-		}()
+		for x := 0; x < cpus; x++ {
+			wg.Add(1)
+			go func() {
+				for x := 0; x < size; x++ {
+					sema.Acquire()
+					sema.Release()
+				}
+				wg.Done()
+			}()
+		}
 
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
-			for x := 1; x <= cap; x++ {
-				sema.Acquire()
-				sema.Release()
-			}
-		}()
-
-		for x := 0; x < cap; x++ {
+		for x := 0; x < size; x++ {
 			sema.Release()
 		}
 
