@@ -1,6 +1,7 @@
 package sema
 
 import (
+	"context"
 	"errors"
 	"time"
 )
@@ -24,6 +25,19 @@ func New(size int) (s Sema, err error) {
 func (s Sema) Acquire() {
 	s.check()
 	s <- struct{}{}
+}
+
+// AcquireWith the given context, will block if semaphore is full
+// until any other holder release or the context is canceled/expired.
+func (s Sema) AcquireWith(ctx context.Context) (ok bool) {
+	s.check()
+	select {
+	case s <- struct{}{}:
+		return true
+	case <-ctx.Done():
+		return false
+	}
+
 }
 
 // Release the semaphore allowing wating waiters to acquire.
