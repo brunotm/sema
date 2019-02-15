@@ -65,14 +65,14 @@ func TestConcurrency(t *testing.T) {
 	sema, _ := New(cap)
 	wg := &sync.WaitGroup{}
 
-	for x := 1; x <= cap; x++ {
+	for x := 0; x < cap; x++ {
 		sema.Acquire()
 	}
 
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
-		for x := 1; x <= cap; x++ {
+		for x := 0; x < cap; x++ {
 			sema.Acquire()
 			time.Sleep(time.Duration(cap) * time.Nanosecond)
 			sema.Release()
@@ -82,14 +82,14 @@ func TestConcurrency(t *testing.T) {
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
-		for x := 1; x <= cap; x++ {
+		for x := 0; x < cap; x++ {
 			sema.Acquire()
 			time.Sleep(time.Duration(cap) * time.Nanosecond)
 			sema.Release()
 		}
 	}()
 
-	for x := 1; x <= cap; x++ {
+	for x := 0; x < cap; x++ {
 		time.Sleep(time.Duration(cap) * time.Nanosecond)
 		sema.Release()
 	}
@@ -120,7 +120,7 @@ func BenchmarkConcurrency(b *testing.B) {
 
 	b.ReportAllocs()
 	for i := 0; i < b.N; i++ {
-		for x := 1; x <= cap; x++ {
+		for x := 0; x < cap; x++ {
 			sema.Acquire()
 		}
 
@@ -142,7 +142,7 @@ func BenchmarkConcurrency(b *testing.B) {
 			}
 		}()
 
-		for x := 1; x <= cap; x++ {
+		for x := 0; x < cap; x++ {
 			sema.Release()
 		}
 
